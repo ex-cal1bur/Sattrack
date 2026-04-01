@@ -328,37 +328,7 @@ const GROUPS = [
 
 // Parse plain-text TLE format into array of records
 // Format: NAME\nLINE1\nLINE2\n (3 lines per satellite)
-console.log(`Recibido grupo ${grp.cat}, longitud texto: ${text.length}`);
-
 function parseTLEText(text, defaultCat) {
-  const records = [];
-  // Normalizar saltos de línea (CRLF -> LF) y eliminar posibles BOM
-  const cleanText = text.replace(/\r\n?/g, '\n').replace(/^\uFEFF/, '');
-  const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-  console.log('parseTLEText: líneas recibidas', lines.length); // Debug
-
-  for (let i = 0; i + 2 < lines.length; i++) {
-    const name = lines[i];
-    const tle1 = lines[i+1];
-    const tle2 = lines[i+2];
-    if (!tle1.startsWith('1 ') || !tle2.startsWith('2 ')) {
-      // Si no coincide, intenta buscar el siguiente bloque
-      console.warn('Formato inesperado, saltando líneas:', i, name, tle1, tle2);
-      continue;
-    }
-    const norad = parseInt(tle2.substring(2, 7).trim(), 10);
-    records.push({
-      OBJECT_NAME: name,
-      NORAD_CAT_ID: norad,
-      TLE_LINE1: tle1,
-      TLE_LINE2: tle2,
-      _cat: defaultCat,
-    });
-    i += 2; // avanzamos tres líneas (el bucle ya suma 1, así que sumamos 2 más)
-  }
-  console.log('parseTLEText: registros parseados', records.length);
-  return records;
-}
   const records = [];
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   for (let i = 0; i + 2 < lines.length; i += 3) {
@@ -857,15 +827,13 @@ async function boot(){
   });
   await Promise.allSettled(promises);
 
- if(allRecs.length >= 5){
-  document.getElementById('stsrc').textContent='LIVE';
-  document.getElementById('lerr').style.display='none';
-} else {
-  console.warn('Usando fallback, solo se obtuvieron', allRecs.length, 'registros');
-  document.getElementById('lerr').style.display='block';
-  allRecs = FALLBACK.map(r=>({...r,_cat:'STATION'}));
-  document.getElementById('stsrc').textContent='CACHED';
-}
+  if(!live||allRecs.length<5){
+    document.getElementById('lerr').style.display='block';
+    allRecs=FALLBACK.map(r=>({...r,_cat:'STATION'}));
+    document.getElementById('stsrc').textContent='CACHED';
+  }else{
+    document.getElementById('stsrc').textContent='LIVE';
+  }
 
   setSt('PARSING '+allRecs.length+' ORBITAL ELEMENTS...',68);
   await new Promise(r=>setTimeout(r,100));
