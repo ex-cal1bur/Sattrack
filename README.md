@@ -2,7 +2,7 @@
 
 ![SATTRACK screenshot](https://via.placeholder.com/800x400?text=SATTRACK+3D+Globe) 
 
-**Live demo:** [sattrack.vercel.app](https://sattrack.vercel.app) *(after deployment)*
+**Live demo:** [https://sattrack-beige.vercel.app/](https://sattrack-beige.vercel.app/) 
 
 SATTRACK visualizes thousands of active satellites in real time using live TLE data from [Celestrak](https://celestrak.org). It combines a 3D Earth model with accurate orbit propagation (SGP4) and includes satellite metadata such as downlink frequencies, mode, and country. An integrated WebSDR panel lets you tune into amateur radio downlinks directly from the browser.
 
