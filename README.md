@@ -1,6 +1,6 @@
 # 🛰️ SATTRACK — Real‑time 3D Satellite Tracker
 
-![SATTRACK screenshot](https://via.placeholder.com/800x400?text=SATTRACK+3D+Globe) <!-- Add actual screenshot later -->
+![SATTRACK screenshot](https://via.placeholder.com/800x400?text=SATTRACK+3D+Globe) 
 
 **Live demo:** [sattrack.vercel.app](https://sattrack.vercel.app) *(after deployment)*
 
