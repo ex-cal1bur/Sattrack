@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>SATTRACK — Satellite Intelligence Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syncopate:wght@700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#010408;--panel:rgba(1,6,16,0.92);
+  --green:#00ff88;--blue:#0099ff;--dim:#1a3550;
+  --text:#90b8d8;--bright:#ddeeff;--border:rgba(0,140,255,0.20);
+  --orange:#ff8800;--pink:#ff00cc;--cyan:#00ffee;--yellow:#ffe040;--red:#ff4455;
+}
+html,body{width:100%;height:100%;background:var(--bg);overflow:hidden;
+  font-family:'Space Mono',monospace;color:var(--text);}
+body{cursor:crosshair;}
+#cvs{position:fixed;inset:0;width:100%;height:100%;}
+body::before{content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px);
+  pointer-events:none;z-index:200;}
+
+/* ── Header ── */
+#hdr{position:fixed;top:0;left:0;right:0;height:50px;z-index:150;
+  display:flex;align-items:center;padding:0 16px;gap:12px;
+  background:linear-gradient(180deg,rgba(1,4,14,0.97) 0%,transparent 100%);
+  border-bottom:1px solid var(--border);}
+#logo{font-family:'Syncopate',sans-serif;font-size:14px;color:var(--green);
+  letter-spacing:5px;text-shadow:0 0 28px rgba(0,255,136,0.5);white-space:nowrap;}
+#logo span{color:var(--blue);}
+#sep{width:1px;height:20px;background:var(--border);}
+#sub{font-size:7px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;white-space:nowrap;}
+#stats{margin-left:auto;display:flex;gap:16px;align-items:center;}
+.st .stl{display:block;font-size:6px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;text-align:right;}
+.st .stv{display:block;font-size:10px;font-variant-numeric:tabular-nums;text-align:right;}
+.g{color:var(--green);} .b{color:var(--blue);} .o{color:var(--orange);}
+
+/* ── Left panel ── */
+#lp{position:fixed;top:58px;left:8px;width:198px;z-index:150;
+  max-height:calc(100vh - 70px);display:flex;flex-direction:column;
+  background:var(--panel);border:1px solid var(--border);backdrop-filter:blur(16px);}
+#lph{padding:7px 10px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;}
+#lph span:first-child{font-size:7px;letter-spacing:3px;color:var(--blue);text-transform:uppercase;}
+#satcnt{font-size:10px;color:var(--green);}
+#search{width:100%;padding:5px 10px;background:transparent;border:none;
+  border-bottom:1px solid var(--border);font-family:'Space Mono',monospace;
+  font-size:9px;color:var(--bright);outline:none;}
+#search::placeholder{color:var(--dim);}
+#sl{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--dim) transparent;}
+.si{padding:5px 9px;border-bottom:1px solid rgba(0,140,255,0.06);
+  cursor:pointer;transition:background .1s;display:flex;align-items:center;gap:6px;}
+.si:hover{background:rgba(0,140,255,0.06);}
+.si.on{background:rgba(0,255,136,0.06);border-left:2px solid var(--green);}
+.sdot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.sn{font-size:8px;color:var(--bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
+.sc{font-size:6px;color:var(--dim);flex-shrink:0;}
+
+/* ── Right panel ── */
+#rp{position:fixed;top:58px;right:8px;width:280px;z-index:150;
+  background:var(--panel);border:1px solid var(--border);backdrop-filter:blur(16px);
+  display:flex;flex-direction:column;
+  transform:translateX(296px);transition:transform .35s cubic-bezier(.16,1,.3,1);}
+#rp.vis{transform:translateX(0);}
+#rph{padding:9px 13px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;}
+#rtitle{font-family:'Syncopate',sans-serif;font-size:8px;color:var(--green);
+  letter-spacing:2px;line-height:1.4;max-width:226px;word-break:break-word;}
+#rclose{font-size:20px;color:var(--dim);cursor:pointer;line-height:1;margin-left:4px;}
+#rclose:hover{color:var(--text);}
+
+/* Tabs */
+#tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.tab{flex:1;padding:6px 4px;font-size:7px;letter-spacing:2px;text-transform:uppercase;
+  text-align:center;cursor:pointer;color:var(--dim);border-bottom:2px solid transparent;
+  transition:all .15s;}
+.tab.on{color:var(--green);border-bottom-color:var(--green);}
+.tab:hover{color:var(--text);}
+
+/* Tab content */
+.tpane{display:none;overflow-y:auto;flex:1;}
+.tpane.on{display:block;}
+
+/* Info pane */
+.rs{padding:7px 13px;border-bottom:1px solid rgba(0,140,255,0.08);}
+.rr{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.rr:last-child{margin-bottom:0;}
+.rk{font-size:7px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;}
+.rv{font-size:9px;color:var(--bright);}
+.rv.g{color:var(--green);} .rv.b{color:var(--blue);}
+#fbox{padding:9px 13px;background:rgba(0,255,136,0.03);border-bottom:1px solid rgba(0,140,255,0.08);}
+#flbl{font-size:6px;color:var(--dim);letter-spacing:2px;margin-bottom:1px;}
+#fval{font-family:'Syncopate',sans-serif;font-size:15px;color:var(--green);
+  text-shadow:0 0 18px rgba(0,255,136,0.35);}
+#fmode{font-size:7px;color:var(--blue);margin-top:1px;}
+.rbtn{display:block;margin:5px 13px;padding:6px 10px;
+  font-family:'Space Mono',monospace;font-size:7px;letter-spacing:2px;
+  text-transform:uppercase;text-align:center;text-decoration:none;
+  border:1px solid currentColor;cursor:pointer;transition:all .15s;}
+#bsnogs{color:var(--blue);}
+#bsnogs:hover{background:rgba(0,140,255,0.08);}
+#rdesc{padding:6px 13px 10px;font-size:7px;color:var(--dim);line-height:1.55;}
+
+/* SDR pane */
+#sdrpane{display:flex;flex-direction:column;height:420px;}
+#sdrtop{padding:8px 13px;border-bottom:1px solid var(--border);flex-shrink:0;}
+#sdrfreqlbl{font-size:7px;color:var(--dim);letter-spacing:2px;margin-bottom:3px;}
+#sdrfreqbig{font-family:'Syncopate',sans-serif;font-size:14px;color:var(--green);}
+#sdrctrl{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;}
+.sdrbtn{padding:4px 8px;font-family:'Space Mono',monospace;font-size:7px;
+  letter-spacing:1px;border:1px solid var(--border);cursor:pointer;
+  background:transparent;color:var(--text);transition:all .12s;}
+.sdrbtn:hover,.sdrbtn.on{background:rgba(0,255,136,0.08);color:var(--green);border-color:var(--green);}
+#iframewrap{flex:1;position:relative;background:#000;}
+#sdriframe{width:100%;height:100%;border:none;display:block;}
+#sdrmsg{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;background:rgba(1,6,16,0.94);
+  font-size:8px;color:var(--dim);letter-spacing:2px;text-align:center;padding:20px;
+  line-height:1.8;}
+#sdrmsg b{color:var(--blue);display:block;margin-bottom:8px;}
+#sdrlinks{padding:8px 13px;border-top:1px solid var(--border);flex-shrink:0;background:rgba(0,20,40,0.6);}
+#sdrlinks p{font-size:7px;color:var(--dim);letter-spacing:1px;margin-bottom:5px;text-transform:uppercase;}
+#sdrlinks a{display:block;color:var(--cyan);font-size:8px;letter-spacing:1px;
+  text-decoration:none;margin-bottom:4px;padding:3px 0;}
+#sdrlinks a:hover{color:var(--green);}
+
+/* ── Legend ── */
+#leg{position:fixed;bottom:26px;left:8px;z-index:150;
+  background:var(--panel);border:1px solid var(--border);
+  backdrop-filter:blur(12px);padding:7px 11px;}
+#legh{font-size:6px;color:var(--blue);letter-spacing:3px;margin-bottom:6px;text-transform:uppercase;}
+.lr{display:flex;align-items:center;gap:5px;margin-bottom:3px;}
+.lr:last-child{margin-bottom:0;}
+.ld{width:5px;height:5px;border-radius:50%;}
+.lt{font-size:7px;}
+
+/* ── Loading ── */
+#load{position:fixed;inset:0;background:var(--bg);z-index:1000;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .6s;}
+#ltitle{font-family:'Syncopate',sans-serif;font-size:26px;color:var(--green);
+  letter-spacing:10px;text-shadow:0 0 50px rgba(0,255,136,0.5);margin-bottom:5px;}
+#lsub{font-size:7px;color:var(--dim);letter-spacing:4px;margin-bottom:28px;}
+#lbarw{width:220px;height:1px;background:rgba(0,140,255,0.15);margin-bottom:11px;}
+#lbar{height:100%;background:var(--green);width:0%;transition:width .2s;box-shadow:0 0 8px var(--green);}
+#lst{font-size:7px;color:var(--dim);letter-spacing:2px;text-align:center;}
+#lerr{font-size:7px;color:var(--orange);letter-spacing:2px;margin-top:5px;display:none;text-align:center;}
+
+#hint{position:fixed;bottom:6px;left:50%;transform:translateX(-50%);
+  font-size:7px;color:rgba(80,130,180,0.3);letter-spacing:2px;text-align:center;z-index:150;}
+#cred{position:fixed;bottom:6px;right:8px;font-size:6px;
+  color:rgba(60,110,160,0.25);letter-spacing:1px;z-index:150;}
+</style>
+</head>
+<body>
+
+<div id="load">
+  <div id="ltitle">SATTRACK</div>
+  <div id="lsub">SATELLITE INTELLIGENCE PLATFORM</div>
+  <div id="lbarw"><div id="lbar"></div></div>
+  <div id="lst">LOADING...</div>
+  <div id="lerr">NETWORK OFFLINE — USING CACHED TLEs</div>
+</div>
+
+<canvas id="cvs"></canvas>
+
+<div id="hdr">
+  <div id="logo">SAT<span>TRACK</span></div>
+  <div id="sep"></div>
+  <div id="sub">Real-time Tracker · Excal1bur</div>
+  <div id="stats">
+    <div class="st"><span class="stl">Tracking</span><span class="stv g" id="stcount">—</span></div>
+    <div class="st"><span class="stl">UTC</span><span class="stv b" id="sttime">--:--:--</span></div>
+    <div class="st"><span class="stl">TLEs</span><span class="stv o" id="stsrc">—</span></div>
+  </div>
+</div>
+
+<div id="lp">
+  <div id="lph"><span>Satellites</span><span id="satcnt">0</span></div>
+  <input id="search" type="text" placeholder="Search satellite...">
+  <div id="sl"></div>
+</div>
+
+<div id="rp">
+  <div id="rph"><div id="rtitle">—</div><span id="rclose">×</span></div>
+  <div id="tabs">
+    <div class="tab on" data-tab="info">INFO</div>
+    <div class="tab" data-tab="sdr">◉ SDR RADIO</div>
+  </div>
+
+  <!-- Info tab -->
+  <div id="info" class="tpane on">
+    <div class="rs">
+      <div class="rr"><span class="rk">NORAD</span><span class="rv g" id="rnorad">—</span></div>
+      <div class="rr"><span class="rk">Category</span><span class="rv b" id="rcat">—</span></div>
+      <div class="rr"><span class="rk">Country</span><span class="rv" id="rcountry">—</span></div>
+    </div>
+    <div class="rs">
+      <div class="rr"><span class="rk">Altitude</span><span class="rv" id="ralt">—</span></div>
+      <div class="rr"><span class="rk">Velocity</span><span class="rv" id="rvel">—</span></div>
+      <div class="rr"><span class="rk">Latitude</span><span class="rv" id="rlat">—</span></div>
+      <div class="rr"><span class="rk">Longitude</span><span class="rv" id="rlon">—</span></div>
+      <div class="rr"><span class="rk">Inclination</span><span class="rv" id="rinc">—</span></div>
+      <div class="rr"><span class="rk">Period</span><span class="rv" id="rper">—</span></div>
+    </div>
+    <div id="fbox">
+      <div id="flbl">Downlink Frequency</div>
+      <div id="fval">—</div>
+      <div id="fmode">—</div>
+    </div>
+    <a id="bsnogs" class="rbtn" href="#" target="_blank">◈ SatNOGS Observations</a>
+    <div id="rdesc">—</div>
+  </div>
+
+  <!-- SDR tab -->
+  <div id="sdr" class="tpane">
+    <div id="sdrpane">
+      <div id="sdrtop">
+        <div id="sdrfreqlbl">Active Frequency</div>
+        <div id="sdrfreqbig">— MHz</div>
+        <div id="sdrctrl">
+          <button class="sdrbtn on" id="btnute">🇳🇱 Netherlands</button>
+          <button class="sdrbtn" id="btnuk">🇬🇧 UK</button>
+          <button class="sdrbtn" id="btnus">🇺🇸 US East</button>
+          <button class="sdrbtn" id="btnjp">🇯🇵 Japan</button>
+        </div>
+      </div>
+      <div id="iframewrap">
+        <iframe id="sdriframe" allowfullscreen sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+        <div id="sdrmsg">
+          <b>SELECT A SATELLITE</b>
+          Choose a satellite with a known frequency from the list to open the WebSDR receiver tuned to its downlink.
+        </div>
+      </div>
+      <div id="sdrlinks">
+        <p>Open WebSDR in new tab — tune manually:</p>
+        <a href="http://websdr.ewi.utwente.nl:8901/" target="_blank">↗ UTwente WebSDR — Netherlands (0–29 MHz + 2m)</a>
+        <a href="http://websdr.suws.org.uk/" target="_blank">↗ SUWS WebSDR — United Kingdom (VHF/UHF)</a>
+        <a href="http://kiwisdr.k4bft.com:8073/" target="_blank">↗ KiwiSDR K4BFT — United States</a>
+        <a href="https://www.satnogs.org" target="_blank">↗ SatNOGS Global Ground Network</a>
+        <a href="https://www.websdr.org" target="_blank">↗ WebSDR.org — Find nearest receiver</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="leg">
+  <div id="legh">Legend</div>
+  <div class="lr"><div class="ld" style="background:#00ff88"></div><span class="lt">Space Stations</span></div>
+  <div class="lr"><div class="ld" style="background:#0099ff"></div><span class="lt">Weather</span></div>
+  <div class="lr"><div class="ld" style="background:#ff8800"></div><span class="lt">Amateur Radio</span></div>
+  <div class="lr"><div class="ld" style="background:#ff00cc"></div><span class="lt">Navigation / GPS</span></div>
+  <div class="lr"><div class="ld" style="background:#00ffee"></div><span class="lt">Science / EO</span></div>
+  <div class="lr"><div class="ld" style="background:#ffe040"></div><span class="lt">Geostationary</span></div>
+  <div class="lr"><div class="ld" style="background:#ff4488"></div><span class="lt">Communications</span></div>
+  <div class="lr"><div class="ld" style="background:#888888"></div><span class="lt">Other / Debris</span></div>
+</div>
+
+<div id="hint">DRAG · rotate &nbsp;|&nbsp; SCROLL · zoom &nbsp;|&nbsp; CLICK · track</div>
+<div id="cred">SATTRACK v3 · TLEs: CELESTRAK · SGP4 · © EXCAL1BUR</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/satellite.js@4.1.3/dist/satellite.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// METADATA — curated frequency/description database
+// ═══════════════════════════════════════════════════════════════════════
+const META={
+  25544:{cat:'STATION',color:0x00ff88,freq:145.800,mode:'FM Voice / APRS 437.800',country:'INTL',
+    desc:'International Space Station. Voice 145.800 MHz FM, APRS 437.800 MHz. Very active on passes.'},
+  48274:{cat:'STATION',color:0x00ff88,freq:145.990,mode:'FM',country:'CHN',
+    desc:'Chinese Space Station Tianhe. 145.990 MHz FM downlink.'},
+  20580:{cat:'SCIENCE',color:0x00ffee,freq:null,mode:null,country:'USA',
+    desc:'Hubble Space Telescope. Data relay via TDRSS Ku-band. No amateur downlink.'},
+  25338:{cat:'WEATHER',color:0x0099ff,freq:137.620,mode:'APT',country:'USA',
+    desc:'NOAA-15 — APT weather at 137.620 MHz. Decode with WXtoImg or SatDump.'},
+  28654:{cat:'WEATHER',color:0x0099ff,freq:137.9125,mode:'APT',country:'USA',
+    desc:'NOAA-18 — APT 137.9125 MHz. Strong signal, excellent with V-dipole.'},
+  33591:{cat:'WEATHER',color:0x0099ff,freq:137.100,mode:'APT',country:'USA',
+    desc:'NOAA-19 — Best NOAA for APT at 137.100 MHz.'},
+  44387:{cat:'WEATHER',color:0x0099ff,freq:137.100,mode:'LRPT',country:'RUS',
+    desc:'Meteor-M2-2 — Russian LRPT color imagery. Decode with SatDump.'},
+  57166:{cat:'WEATHER',color:0x0099ff,freq:137.900,mode:'LRPT',country:'RUS',
+    desc:'Meteor-M2-3 — LRPT color imagery at 137.900 MHz.'},
+  27607:{cat:'AMATEUR',color:0xff8800,freq:436.795,mode:'FM Repeater',country:'SAU',
+    desc:'SO-50 — FM repeater. UL 145.850 MHz (74.4 Hz tone), DL 436.795 MHz.'},
+  43017:{cat:'AMATEUR',color:0xff8800,freq:145.960,mode:'FM',country:'USA',
+    desc:'AO-91 RadFxSat — FM transponder downlink 145.960 MHz.'},
+  39444:{cat:'AMATEUR',color:0xff8800,freq:145.935,mode:'1k2 BPSK',country:'GBR',
+    desc:'FUNcube-1/AO-73 — 1k2 BPSK educational beacon 145.935 MHz.'},
+  44909:{cat:'AMATEUR',color:0xff8800,freq:435.640,mode:'SSB/CW',country:'RUS',
+    desc:'RS-44 — Linear SSB/CW transponder. UL 145.935–145.975 MHz.'},
+  40697:{cat:'SCIENCE',color:0x00ffee,freq:8090,mode:'X-band',country:'EU',
+    desc:'ESA Sentinel-2A — MultiSpectral Imager. Copernicus programme.'},
+  49260:{cat:'SCIENCE',color:0x00ffee,freq:8025,mode:'X-band',country:'USA',
+    desc:'Landsat-9 — OLI-2/TIRS-2. USGS/NASA Earth observation.'},
+  25994:{cat:'SCIENCE',color:0x00ffee,freq:8212.5,mode:'X-band',country:'USA',
+    desc:'NASA Terra — MODIS. X-band direct broadcast at 8212.5 MHz.'},
+  41866:{cat:'GEO',color:0xffe040,freq:1694.1,mode:'HRIT L-band',country:'USA',
+    desc:'GOES-16 — Geostationary weather. HRIT at 1694.1 MHz (dish needed).'},
+  35933:{cat:'AMATEUR',color:0xff8800,freq:435.950,mode:'9k6 FSK',country:'DEU',
+    desc:'BEESAT-1 (TU Berlin) — 9k6 FSK telemetry at 435.950 MHz.'},
+  41917:{cat:'COMMS',color:0xff4488,freq:1621.35,mode:'L-band',country:'USA',
+    desc:'Iridium Next — L-band 1616–1626.5 MHz. Watch for predictable flares!'},
+  43226:{cat:'AMATEUR',color:0xff8800,freq:436.500,mode:'CW/BPSK',country:'JPN',
+    desc:'NEXUS (JO-99) — CW/BPSK downlink at 435.880 MHz. JARL sponsored.'},
+  46495:{cat:'AMATEUR',color:0xff8800,freq:435.880,mode:'CW',country:'JPN',
+    desc:'BIRDS-4 — 9k6 GMSK downlink. Multi-nation university CubeSat.'},
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// CELESTRAK GROUPS — FORMAT=TLE (plain text, includes actual TLE strings)
+// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+// CELESTRAK GROUPS — FORMAT=TLE (plain text, includes actual TLE strings)
+// ═══════════════════════════════════════════════════════════════════════
+const GROUPS = [
+  { url: '/api/celestrak?group=stations',   cat: 'STATION' },
+  { url: '/api/celestrak?group=weather',    cat: 'WEATHER' },
+  { url: '/api/celestrak?group=noaa',       cat: 'WEATHER' },
+  { url: '/api/celestrak?group=amateur',    cat: 'AMATEUR' },
+  { url: '/api/celestrak?group=science',    cat: 'SCIENCE' },
+  { url: '/api/celestrak?group=geo',        cat: 'GEO' },
+  { url: '/api/celestrak?group=gps-ops',    cat: 'NAV' },
+  { url: '/api/celestrak?group=galileo',    cat: 'NAV' },
+  { url: '/api/celestrak?group=iridium-NEXT', cat: 'COMMS' },
+  { url: '/api/celestrak?group=starlink',   cat: 'COMMS' },
+  { url: '/api/celestrak?group=active',     cat: 'OTHER' }
+];
+
+// Parse plain-text TLE format into array of records
+// Format: NAME\nLINE1\nLINE2\n (3 lines per satellite)
+function parseTLEText(text, defaultCat) {
+  const records = [];
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  for (let i = 0; i + 2 < lines.length; i += 3) {
+    const name = lines[i];
+    const tle1 = lines[i+1];
+    const tle2 = lines[i+2];
+    if (!tle1.startsWith('1 ') || !tle2.startsWith('2 ')) {
+      i -= 2; // re-align if off
+      continue;
+    }
+    const norad = parseInt(tle2.substring(2, 7).trim(), 10);
+    records.push({
+      OBJECT_NAME: name,
+      NORAD_CAT_ID: norad,
+      TLE_LINE1: tle1,
+      TLE_LINE2: tle2,
+      _cat: defaultCat,
+    });
+  }
+  return records;
+}
+
+const CAT_COLORS={
+  STATION:0x00ff88,WEATHER:0x0099ff,AMATEUR:0xff8800,
+  NAV:0xff00cc,SCIENCE:0x00ffee,GEO:0xffe040,COMMS:0xff4488,OTHER:0x668899
+};
+const CAT_LBL={STATION:'ISS',WEATHER:'WX',AMATEUR:'HAM',NAV:'NAV',SCIENCE:'SCI',GEO:'GEO',COMMS:'COM',OTHER:'OTH'};
+
+// Fallback TLEs
+// FALLBACK TLEs — checksums verified correct
+const FALLBACK=[
+  {OBJECT_NAME:'ISS (ZARYA)',NORAD_CAT_ID:25544,
+   TLE_LINE1:'1 25544U 98067A   25070.54791667  .00020000  00000-0  36000-3 0  9993',
+   TLE_LINE2:'2 25544  51.6416  88.1234 0006000 145.0000 215.0000 15.49000000000004'},
+  {OBJECT_NAME:'TIANGONG (CSS)',NORAD_CAT_ID:48274,
+   TLE_LINE1:'1 48274U 21035A   25070.50000000  .00010000  00000-0  13000-3 0  9993',
+   TLE_LINE2:'2 48274  41.4750 270.0000 0006200 145.0000 215.0000 15.61000000000006'},
+  {OBJECT_NAME:'NOAA-19',NORAD_CAT_ID:33591,
+   TLE_LINE1:'1 33591U 09005A   25070.50000000  .00000000  00000-0  53000-4 0  9996',
+   TLE_LINE2:'2 33591  99.1000  99.0000 0013000 312.0000  47.0000 14.12000000000009'},
+  {OBJECT_NAME:'NOAA-18',NORAD_CAT_ID:28654,
+   TLE_LINE1:'1 28654U 05018A   25070.50000000  .00000000  00000-0  60000-4 0  9998',
+   TLE_LINE2:'2 28654  99.0000  58.0000 0013000 220.0000 140.0000 14.11000000000008'},
+  {OBJECT_NAME:'NOAA-15',NORAD_CAT_ID:25338,
+   TLE_LINE1:'1 25338U 98030A   25070.50000000  .00000100  00000-0  78000-4 0  9990',
+   TLE_LINE2:'2 25338  98.7000  22.0000 0011000 102.0000 259.0000 14.26000000000005'},
+  {OBJECT_NAME:'METEOR-M2-3',NORAD_CAT_ID:57166,
+   TLE_LINE1:'1 57166U 23091A   25070.50000000  .00000040  00000-0  18000-4 0  9996',
+   TLE_LINE2:'2 57166  98.8000 310.0000 0003000 345.0000  15.0000 14.23000000000007'},
+  {OBJECT_NAME:'SO-50 (SAUDISAT-1C)',NORAD_CAT_ID:27607,
+   TLE_LINE1:'1 27607U 02058C   25070.50000000  .00000060  00000-0  21000-4 0  9999',
+   TLE_LINE2:'2 27607  64.5600 231.0000 0059000 175.0000 185.0000 14.74000000000008'},
+  {OBJECT_NAME:'AO-91 (RADFXSAT)',NORAD_CAT_ID:43017,
+   TLE_LINE1:'1 43017U 17073E   25070.50000000  .00001200  00000-0  26000-4 0  9997',
+   TLE_LINE2:'2 43017  97.7000 145.0000 0023000 154.0000 206.0000 14.81000000000007'},
+  {OBJECT_NAME:'HUBBLE (HST)',NORAD_CAT_ID:20580,
+   TLE_LINE1:'1 20580U 90037B   25070.50000000  .00001200  00000-0  61000-4 0  9997',
+   TLE_LINE2:'2 20580  28.4700  37.0000 0002600  60.0000 300.0000 15.09500000000005'},
+  {OBJECT_NAME:'GOES-16',NORAD_CAT_ID:41866,
+   TLE_LINE1:'1 41866U 16071A   25070.50000000 -.00000264  00000-0  00000+0 0  9991',
+   TLE_LINE2:'2 41866   0.0700 107.0000 0000900 244.0000 295.0000  1.00272130000003'},
+];
+
+// ═══════════════════════════════════════════════════════════════════════
+// THREE.JS
+// ═══════════════════════════════════════════════════════════════════════
+let W=innerWidth,H=innerHeight;
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(50,W/H,0.01,400);
+const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('cvs'),antialias:true});
+renderer.setSize(W,H);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setClearColor(0x010408);
+
+const sun=new THREE.DirectionalLight(0xfff5e0,0.85);
+sun.position.set(8,4,5);scene.add(sun);
+scene.add(new THREE.AmbientLight(0x1a2a44,1.1));
+
+// Stars
+(()=>{
+  const N=8000,pos=new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    const r=120+Math.random()*80,t=Math.random()*Math.PI*2,p=Math.acos(2*Math.random()-1);
+    pos[i*3]=r*Math.sin(p)*Math.cos(t);pos[i*3+1]=r*Math.cos(p);pos[i*3+2]=r*Math.sin(p)*Math.sin(t);
+  }
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:0.18,transparent:true,opacity:0.9,sizeAttenuation:true})));
+})();
+
+// Earth with real NASA texture
+(()=>{
+  const loader=new THREE.TextureLoader();
+  // Blue Marble texture from jsdelivr CDN
+  const earthTex=loader.load(
+    'https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg',
+    ()=>renderer.render(scene,camera), // re-render when loaded
+    undefined,
+    ()=>{ // fallback: draw canvas texture if CDN fails
+      buildCanvasEarth();
+    }
+  );
+  const bumpTex=loader.load('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png');
+  const specTex=loader.load('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-water.png');
+  // Clouds disabled — CDN file not found
+  // const cloudTex=new THREE.TextureLoader().load('...');
+
+  const earthMesh=new THREE.Mesh(
+    new THREE.SphereGeometry(1,80,80),
+    new THREE.MeshPhongMaterial({
+      map:earthTex,
+      bumpMap:bumpTex,bumpScale:0.008,
+      specularMap:specTex,specular:new THREE.Color(0x226699),shininess:22,
+      emissive:0x020d1a,emissiveIntensity:0.04
+    })
+  );
+  scene.add(earthMesh);
+  window._earthMesh=earthMesh; // expose to main loop
+
+  // Atmosphere glow
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(1.025,32,32),
+    new THREE.MeshPhongMaterial({color:0x1a55dd,transparent:true,opacity:0.09,side:THREE.BackSide,emissive:0x001133})));
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(1.07,32,32),
+    new THREE.MeshPhongMaterial({color:0x0011bb,transparent:true,opacity:0.038,side:THREE.BackSide})));
+})();
+
+function buildCanvasEarth(){
+  const tc=document.createElement('canvas');tc.width=2048;tc.height=1024;
+  const cx=tc.getContext('2d');
+  const og=cx.createLinearGradient(0,0,0,1024);og.addColorStop(0,'#061428');og.addColorStop(1,'#0a1e36');
+  cx.fillStyle=og;cx.fillRect(0,0,2048,1024);
+  cx.strokeStyle='rgba(0,100,200,0.15)';cx.lineWidth=0.7;
+  for(let la=-80;la<=80;la+=10){const y=(90-la)/180*1024;cx.beginPath();cx.moveTo(0,y);cx.lineTo(2048,y);cx.stroke();}
+  for(let lo=0;lo<360;lo+=10){const x=lo/360*2048;cx.beginPath();cx.moveTo(x,0);cx.lineTo(x,1024);cx.stroke();}
+  const lg=cx.createLinearGradient(0,0,0,1024);lg.addColorStop(0,'rgba(25,100,48,0.80)');lg.addColorStop(1,'rgba(18,75,35,0.80)');
+  cx.fillStyle=lg;
+  [[390,400,170,136,-0.25],[320,480,64,80,0.15],[530,640,88,164,0.1],[1060,380,66,72,0],[1070,620,82,150,0.05],[1380,390,280,136,0],[1440,530,120,80,0.15],[610,280,40,52,0],[1560,680,94,66,0.2],[1250,540,42,66,0.05]]
+  .forEach(([bx,by,rx,ry,rot])=>{cx.save();cx.translate(bx,by);cx.rotate(rot);cx.scale(rx/100,ry/100);cx.beginPath();for(let a=0,f=true;a<Math.PI*2;a+=0.1){const px=100*Math.cos(a)+(Math.random()-.5)*6,py=100*Math.sin(a)+(Math.random()-.5)*6;f?(cx.moveTo(px,py),f=false):cx.lineTo(px,py);}cx.closePath();cx.restore();cx.fill();});
+  scene.children.filter(c=>c.isMesh&&c.geometry.type==='SphereGeometry'&&Math.abs(c.geometry.parameters.radius-1)<0.01)
+    .forEach(m=>{if(m.material.map)m.material.map=new THREE.CanvasTexture(tc);});
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// COORDINATE HELPERS
+// ═══════════════════════════════════════════════════════════════════════
+
+// ECI → Three.js scene coords (scale km→units, remap axes)
+// satellite.js ECI: x=vernal equinox, y=90°E equatorial, z=north pole
+// Three.js: y=up → remap z→y, y→z, negate x to flip handedness
+function eciToScene(pos){
+  const s=1/6371;
+  return new THREE.Vector3(-pos.x*s, pos.z*s, pos.y*s);
+}
+
+// ECEF lat/lon for orbit lines (they rotate with Earth via earthMesh offset)
+function ll2v(lat,lon,altKm){
+  const r=(6371+altKm)/6371,phi=(90-lat)*Math.PI/180,theta=(lon+180)*Math.PI/180;
+  return new THREE.Vector3(-r*Math.sin(phi)*Math.cos(theta),r*Math.cos(phi),r*Math.sin(phi)*Math.sin(theta));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SATELLITE ENGINE — satellites in ECI space (not attached to Earth)
+// ═══════════════════════════════════════════════════════════════════════
+let sats=[],orbitLine=null,selIdx=-1;
+const MAX_SATS=2000;
+
+// Satellite sprite cache per color
+const _spriteCache={};
+function makeSatSprite(hexColor){
+  const key=hexColor.toString(16);
+  if(_spriteCache[key])return _spriteCache[key];
+  const S=64;
+  const c=document.createElement('canvas');c.width=S;c.height=S;
+  const cx=c.getContext('2d');
+  const r=(hexColor>>16)&0xff, g=(hexColor>>8)&0xff, b=hexColor&0xff;
+  const col=`rgb(${r},${g},${b})`;
+  const colA=`rgba(${r},${g},${b},`;
+
+  // Glow
+  cx.globalAlpha=0.18;
+  cx.fillStyle=col;
+  cx.beginPath();cx.arc(32,32,22,0,Math.PI*2);cx.fill();
+  cx.globalAlpha=1;
+
+  // Solar panels left
+  cx.fillStyle=colA+'0.85)';
+  cx.fillRect(2,26,16,12);
+  // Solar panels right
+  cx.fillRect(46,26,16,12);
+  // Panel connectors
+  cx.fillStyle=colA+'0.6)';
+  cx.fillRect(18,30,5,4);cx.fillRect(41,30,5,4);
+  // Satellite body
+  cx.fillStyle=col;
+  cx.fillRect(23,19,18,26);
+  // Body highlight
+  cx.fillStyle=colA+'0.4)';
+  cx.fillRect(25,21,6,22);
+  // Antenna
+  cx.strokeStyle=col;cx.lineWidth=1.5;
+  cx.beginPath();cx.moveTo(32,19);cx.lineTo(32,8);cx.stroke();
+  cx.beginPath();cx.arc(32,6,3,0,Math.PI*2);cx.fill();
+
+  const tex=new THREE.CanvasTexture(c);
+  const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:true,depthWrite:false});
+  _spriteCache[key]=mat;
+  return mat;
+}
+
+function mkSat(rec,defaultCat){
+  if(sats.length>=MAX_SATS)return null;
+  const norad=rec.NORAD_CAT_ID,name=rec.OBJECT_NAME,tle1=rec.TLE_LINE1,tle2=rec.TLE_LINE2;
+  if(!tle1||!tle2||!name)return null;
+  let sr;
+  try{ sr=satellite.twoline2satrec(tle1,tle2); }
+  catch(e){ return null; }
+  if(!sr)return null;
+  // Don't check sr.error — field may not exist in all satellite.js versions
+  const m=META[norad]||{};
+  const cat=m.cat||defaultCat||'OTHER';
+  const col=m.color||CAT_COLORS[cat]||CAT_COLORS.OTHER;
+
+  // Use sprite with satellite silhouette
+  const spriteMat=makeSatSprite(col);
+  const mesh=new THREE.Sprite(spriteMat.clone());
+  mesh.scale.set(0.06,0.06,1);
+  mesh.userData.idx=sats.length;
+  scene.add(mesh); // ECI space — NOT attached to Earth group
+  return{name,norad,cat,color:col,satrec:sr,mesh,meta:m,
+    _lat:0,_lon:0,_alt:500,_vel:7.6};
+}
+
+function updPos(now){
+  const gst=satellite.gstime(now);
+  let ok=0;
+  sats.forEach(s=>{
+    if(!s)return;
+    try{
+      const pv=satellite.propagate(s.satrec,now);
+      if(!pv||!pv.position||isNaN(pv.position.x)||isNaN(pv.position.y))return;
+      // Store geodetic for info panel
+      const gd=satellite.eciToGeodetic(pv.position,gst);
+      s._lat=satellite.degreesLat(gd.latitude);
+      s._lon=satellite.degreesLong(gd.longitude);
+      s._alt=Math.max(100,gd.height);
+      s._vel=pv.velocity?Math.sqrt(pv.velocity.x**2+pv.velocity.y**2+pv.velocity.z**2):7.6;
+      // Position in ECI (Three.js world space — does NOT rotate with Earth)
+      s.mesh.position.copy(eciToScene(pv.position));
+      s.mesh.visible=true;
+      ok++;
+    }catch(e){s.mesh.visible=false;}
+  });
+  return ok;
+}
+
+function mkOrbit(satrec){
+  const pts=[],now=new Date(),T=(2*Math.PI/satrec.no)*60*1000;
+  for(let i=0;i<=120;i++){
+    const t=new Date(now.getTime()+(i/120)*T);
+    try{
+      const pv=satellite.propagate(satrec,t);
+      if(!pv.position||isNaN(pv.position.x))continue;
+      pts.push(eciToScene(pv.position)); // ECI — orbit fixed in space
+    }catch(e){}
+  }return pts;
+}
+
+function showOrbit(idx){
+  if(orbitLine){scene.remove(orbitLine);orbitLine=null;}
+  if(idx<0)return;
+  const s=sats[idx];if(!s)return;
+  const pts=mkOrbit(s.satrec);if(pts.length<2)return;
+  orbitLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({color:s.color,transparent:true,opacity:0.55}));
+  scene.add(orbitLine);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════════════════════════════
+let filteredSats=[];
+function buildList(query=''){
+  const sl=document.getElementById('sl');sl.innerHTML='';
+  const q=query.toLowerCase();
+  filteredSats=[];
+  sats.forEach((s,i)=>{
+    if(!s)return;
+    if(q&&!s.name.toLowerCase().includes(q)&&!s.cat.toLowerCase().includes(q))return;
+    filteredSats.push({s,i});
+    const d=document.createElement('div');d.className='si';d.dataset.i=i;
+    if(i===selIdx)d.classList.add('on');
+    const c='#'+s.color.toString(16).padStart(6,'0');
+    d.innerHTML=`<div class="sdot" style="background:${c}"></div>
+      <span class="sn">${s.name}</span><span class="sc">${CAT_LBL[s.cat]||s.cat}</span>`;
+    d.onclick=()=>selSat(i);
+    sl.appendChild(d);
+  });
+  document.getElementById('satcnt').textContent=filteredSats.length+' / '+sats.filter(Boolean).length;
+}
+
+document.getElementById('search').addEventListener('input',e=>buildList(e.target.value));
+
+// SDR receivers
+const SDR_RECEIVERS={
+  btnute:'http://websdr.ewi.utwente.nl:8901/',
+  btnuk:'http://websdr.suws.org.uk/',
+  btnus:'http://kiwisdr.k4bft.com:8073/',
+  btnjp:'http://websdr.ja3gow.net:8901/',
+};
+let activeSdrBtn='btnute';
+document.querySelectorAll('.sdrbtn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.sdrbtn').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');activeSdrBtn=btn.id;
+    if(selIdx>=0)loadSdr(selIdx);
+  });
+});
+
+function loadSdr(idx){
+  const s=sats[idx];if(!s)return;
+  const m=s.meta||{};
+  const iframe=document.getElementById('sdriframe');
+  const msg=document.getElementById('sdrmsg');
+  document.getElementById('sdrfreqbig').textContent=m.freq?m.freq.toFixed(4)+' MHz':'No public frequency';
+  if(m.freq&&m.freq<500){
+    const base=SDR_RECEIVERS[activeSdrBtn]||SDR_RECEIVERS.btnute;
+    const fkhz=Math.round(m.freq*1000);
+    // Try to load with frequency parameter
+    iframe.src=base+'?tune='+fkhz+'k';
+    msg.style.display='none';
+    // If iframe fails to load (X-Frame-Options), show message
+    iframe.onerror=()=>{msg.style.display='flex';};
+  }else{
+    iframe.src='about:blank';
+    msg.innerHTML=`<b>${m.freq?'HIGH FREQUENCY — DISH REQUIRED':'NO PUBLIC DOWNLINK'}</b>
+      ${m.freq?m.freq+' MHz requires X-band / L-band hardware. Use a dedicated receiver.':'This satellite uses professional-grade telemetry. No public WebSDR available.'}`;
+    msg.style.display='flex';
+  }
+}
+
+function selSat(idx){
+  selIdx=idx;
+  document.querySelectorAll('.si').forEach(el=>el.classList.toggle('on',+el.dataset.i===idx));
+  const s=sats[idx];if(!s)return;
+  const m=s.meta||{};
+  document.getElementById('rp').classList.add('vis');
+  document.getElementById('rtitle').textContent=s.name;
+  document.getElementById('rnorad').textContent=s.norad;
+  document.getElementById('rcat').textContent=s.cat;
+  document.getElementById('rcountry').textContent=m.country||'—';
+  document.getElementById('rdesc').textContent=m.desc||'No additional information. NORAD: '+s.norad;
+  document.getElementById('rinc').textContent=(s.satrec.inclo*180/Math.PI).toFixed(2)+'°';
+  document.getElementById('rper').textContent=(2*Math.PI/s.satrec.no).toFixed(1)+' min';
+  if(m.freq){
+    document.getElementById('fval').textContent=m.freq.toFixed(m.freq>1000?1:4)+' MHz';
+    document.getElementById('fmode').textContent=m.mode||'—';
+  }else{
+    document.getElementById('fval').textContent='No public downlink';
+    document.getElementById('fmode').textContent='Professional telemetry only';
+  }
+  document.getElementById('bsnogs').href=`https://network.satnogs.org/observations/?satellite__norad_cat_id=${s.norad}&status=good`;
+  sats.forEach((ss,i)=>{if(ss)ss.mesh.scale.set(i===idx?0.10:0.06,i===idx?0.10:0.06,1);});
+  showOrbit(idx);
+  // Update SDR panel
+  loadSdr(idx);
+  // Scroll list to item
+  const el=document.querySelector(`.si[data-i="${idx}"]`);
+  if(el)el.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+function updPanel(){
+  if(selIdx<0)return;const s=sats[selIdx];if(!s)return;
+  document.getElementById('ralt').textContent=s._alt.toFixed(1)+' km';
+  document.getElementById('rvel').textContent=s._vel.toFixed(3)+' km/s';
+  document.getElementById('rlat').textContent=(s._lat>=0?'N':'S')+Math.abs(s._lat).toFixed(3)+'°';
+  document.getElementById('rlon').textContent=(s._lon>=0?'E':'W')+Math.abs(s._lon).toFixed(3)+'°';
+}
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+    document.querySelectorAll('.tpane').forEach(p=>p.classList.remove('on'));
+    tab.classList.add('on');
+    document.getElementById(tab.dataset.tab).classList.add('on');
+  });
+});
+
+document.getElementById('rclose').onclick=()=>{
+  document.getElementById('rp').classList.remove('vis');
+  document.querySelectorAll('.si').forEach(el=>el.classList.remove('on'));
+  sats.forEach(s=>{if(s)s.mesh.scale.set(0.06,0.06,1);});
+  showOrbit(-1);selIdx=-1;
+  document.getElementById('sdriframe').src='about:blank';
+  document.getElementById('sdrmsg').style.display='flex';
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// CAMERA
+// ═══════════════════════════════════════════════════════════════════════
+let sph={theta:0.4,phi:1.15,r:2.9},dragging=false,hasDragged=false,prev={x:0,y:0},ds={x:0,y:0};
+const cvs2=document.getElementById('cvs');
+cvs2.addEventListener('mousedown',e=>{dragging=true;hasDragged=false;ds=prev={x:e.clientX,y:e.clientY};});
+window.addEventListener('mouseup',()=>{dragging=false;});
+window.addEventListener('mousemove',e=>{
+  if(!dragging)return;const dx=e.clientX-prev.x,dy=e.clientY-prev.y;
+  if(Math.abs(e.clientX-ds.x)>3||Math.abs(e.clientY-ds.y)>3)hasDragged=true;
+  sph.theta-=dx*0.006;sph.phi=Math.max(0.1,Math.min(Math.PI-0.1,sph.phi-dy*0.006));
+  prev={x:e.clientX,y:e.clientY};
+});
+cvs2.addEventListener('wheel',e=>{e.preventDefault();sph.r=Math.max(1.25,Math.min(12,sph.r+e.deltaY*0.004));},{passive:false});
+let td=0;
+cvs2.addEventListener('touchstart',e=>{
+  if(e.touches.length===1){dragging=true;hasDragged=false;ds=prev={x:e.touches[0].clientX,y:e.touches[0].clientY};}
+  else if(e.touches.length===2)td=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+},{passive:true});
+cvs2.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(e.touches.length===1&&dragging){
+    const dx=e.touches[0].clientX-prev.x,dy=e.touches[0].clientY-prev.y;hasDragged=true;
+    sph.theta-=dx*0.006;sph.phi=Math.max(0.1,Math.min(Math.PI-0.1,sph.phi-dy*0.006));
+    prev={x:e.touches[0].clientX,y:e.touches[0].clientY};
+  }else if(e.touches.length===2){
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    sph.r=Math.max(1.25,Math.min(12,sph.r-(d-td)*0.006));td=d;
+  }
+},{passive:false});
+cvs2.addEventListener('touchend',()=>{dragging=false;});
+
+const ray=new THREE.Raycaster();
+ray.params.Points={threshold:0.02};
+cvs2.addEventListener('click',e=>{
+  if(hasDragged)return;
+  const rect=cvs2.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2(
+    ((e.clientX-rect.left)/rect.width)*2-1,
+    -((e.clientY-rect.top)/rect.height)*2+1
+  ),camera);
+  const hits=ray.intersectObjects(sats.filter(s=>s&&s.mesh.visible).map(s=>s.mesh));
+  if(hits.length>0)selSat(hits[0].object.userData.idx);
+});
+
+window.addEventListener('resize',()=>{W=innerWidth;H=innerHeight;camera.aspect=W/H;camera.updateProjectionMatrix();renderer.setSize(W,H);});
+
+// Clock
+function tick(){
+  const n=new Date(),p=v=>v.toString().padStart(2,'0');
+  document.getElementById('sttime').textContent=`${p(n.getUTCHours())}:${p(n.getUTCMinutes())}:${p(n.getUTCSeconds())}`;
+}
+
+// Render loop
+// Earth rotates at real sidereal rate synced to GMST
+// Satellites are in ECI (world space) — they don't rotate with Earth
+const EARTH_ROT_OFFSET=Math.PI; // texture offset: lon=0 → π in Three.js sphere
+let frame=0;
+function animate(){
+  requestAnimationFrame(animate);
+  const now=new Date();
+  // Earth rotation: GMST gives angle of vernal equinox from Greenwich
+  // We negate because Three.js sphere lon=0 is at -X axis
+  if(window._earthMesh){
+    const gmst=satellite.gstime(now);
+    window._earthMesh.rotation.y=-(gmst)+EARTH_ROT_OFFSET;
+  }
+  camera.position.set(sph.r*Math.sin(sph.phi)*Math.cos(sph.theta),sph.r*Math.cos(sph.phi),sph.r*Math.sin(sph.phi)*Math.sin(sph.theta));
+  camera.lookAt(0,0,0);
+  if(frame%2===0){updPos(now);updPanel();}
+  if(frame%30===0)tick();
+  frame++;renderer.render(scene,camera);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════════════
+function setSt(txt,pct){document.getElementById('lst').textContent=txt;document.getElementById('lbar').style.width=pct+'%';}
+
+async function boot(){
+  setSt('INITIALIZING 3D RENDERER...',5);
+  await new Promise(r=>setTimeout(r,150));
+  setSt('LOADING NASA BLUE MARBLE TEXTURE...',12);
+  await new Promise(r=>setTimeout(r,200));
+  setSt('FETCHING LIVE TLEs FROM CELESTRAK...',20);
+
+  let allRecs=[],live=false,loaded=0;
+  const promises=GROUPS.map(async grp=>{
+    try{
+      const r=await fetch(grp.url,{signal:AbortSignal.timeout(12000)});
+      if(!r.ok)return;
+      const text=await r.text();
+      if(!text||text.trim().length<10)return;
+      const recs=parseTLEText(text,grp.cat);
+      if(recs.length===0)return;
+      allRecs.push(...recs);
+      live=true;loaded++;
+      setSt(`FETCHING TLEs... ${loaded} groups / ${allRecs.length} sats`,20+Math.min(loaded*4,45));
+    }catch(e){}
+  });
+  await Promise.allSettled(promises);
+
+  if(!live||allRecs.length<5){
+    document.getElementById('lerr').style.display='block';
+    allRecs=FALLBACK.map(r=>({...r,_cat:'STATION'}));
+    document.getElementById('stsrc').textContent='CACHED';
+  }else{
+    document.getElementById('stsrc').textContent='LIVE';
+  }
+
+  setSt('PARSING '+allRecs.length+' ORBITAL ELEMENTS...',68);
+  await new Promise(r=>setTimeout(r,100));
+
+  if(allRecs.length===0){
+    setSt('ERROR: No TLE data received.',68);
+    return;
+  }
+
+  // Deduplicate, prioritize those with metadata
+  const seen=new Set();
+  // First pass: wanted (with metadata)
+  allRecs.filter(d=>META[d.NORAD_CAT_ID]).forEach(rec=>{
+    if(seen.has(rec.NORAD_CAT_ID))return;seen.add(rec.NORAD_CAT_ID);
+    const s=mkSat(rec,rec._cat);if(s)sats.push(s);
+  });
+  // Second pass: rest up to MAX_SATS
+  allRecs.filter(d=>!META[d.NORAD_CAT_ID]).forEach(rec=>{
+    if(seen.has(rec.NORAD_CAT_ID))return;seen.add(rec.NORAD_CAT_ID);
+    const s=mkSat(rec,rec._cat);if(s)sats.push(s);
+  });
+
+  setSt('COMPUTING POSITIONS FOR '+sats.length+' SATELLITES...',82);
+  if(sats.length===0){
+    setSt('ERROR: 0 satellites parsed from '+allRecs.length+' records. TLE format issue?',82);
+    // Show first record for debug
+    if(allRecs.length>0) console.log('First record sample:', JSON.stringify(allRecs[0]));
+    return;
+  }
+  await new Promise(r=>setTimeout(r,100));
+  const visCount=updPos(new Date());
+
+  setSt('BUILDING CATALOGUE...',93);
+  await new Promise(r=>setTimeout(r,80));
+  buildList();
+
+  const n=sats.filter(Boolean).length;
+  document.getElementById('stcount').textContent=n;
+  document.getElementById('satcnt').textContent=n+' / '+n;
+  setSt('TRACKING '+visCount+' / '+n+' SATELLITES ✓',100);
+  await new Promise(r=>setTimeout(r,380));
+
+  const ld=document.getElementById('load');ld.style.opacity='0';
+  setTimeout(()=>{ld.style.display='none';},600);
+  animate();
+}
+
+function waitSat(cb,n=0){
+  if(typeof satellite!=='undefined'&&satellite.twoline2satrec)cb();
+  else if(n<60)setTimeout(()=>waitSat(cb,n+1),100);
+  else document.getElementById('lst').textContent='ERROR: satellite.js failed. Check internet connection.';
+}
+waitSat(boot);
+</script>
+</body>
+</html>
